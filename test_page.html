@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Merger API - Test Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #444;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .file-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            background: #f9f9f9;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .file-input:hover {
+            border-color: #667eea;
+            background: #f0f0ff;
+        }
+        
+        .file-name {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            display: block;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            display: block;
+        }
+        
+        .result h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .result img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .result-info {
+            font-size: 14px;
+            color: #555;
+            margin: 5px 0;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 600px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Image Merger API</h1>
+        <p class="subtitle">Test the image merging API by uploading two images</p>
+        
+        <form id="mergeForm">
+            <div class="form-group">
+                <label for="apiUrl">API Base URL</label>
+                <input type="text" id="apiUrl" value="http://localhost:8000" 
+                       placeholder="http://localhost:8000 or https://your-app.railway.app">
+            </div>
+            
+            <div class="grid">
+                <div class="form-group">
+                    <label for="modelImage">Model Image (Left)</label>
+                    <input type="file" id="modelImage" accept="image/*" class="file-input" required>
+                    <div class="file-name" id="modelFileName">No file chosen</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="productImage">Product Image (Right)</label>
+                    <input type="file" id="productImage" accept="image/*" class="file-input" required>
+                    <div class="file-name" id="productFileName">No file chosen</div>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="form-group">
+                    <label for="targetHeight">Target Height (px)</label>
+                    <input type="number" id="targetHeight" value="1200" min="100" max="5000">
+                </div>
+                
+                <div class="form-group">
+                    <label for="outputFormat">Output Format</label>
+                    <select id="outputFormat">
+                        <option value="jpg">JPG (Smaller file)</option>
+                        <option value="png">PNG (Lossless)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button type="submit" id="submitBtn">Merge Images</button>
+        </form>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Merging images...</p>
+        </div>
+        
+        <div class="result" id="result">
+            <h3 id="resultTitle"></h3>
+            <p id="resultMessage"></p>
+            <div id="resultDetails"></div>
+            <img id="resultImage" alt="Merged result">
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('mergeForm');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        // File input handlers
+        document.getElementById('modelImage').addEventListener('change', function(e) {
+            document.getElementById('modelFileName').textContent = 
+                e.target.files[0] ? e.target.files[0].name : 'No file chosen';
+        });
+        
+        document.getElementById('productImage').addEventListener('change', function(e) {
+            document.getElementById('productFileName').textContent = 
+                e.target.files[0] ? e.target.files[0].name : 'No file chosen';
+        });
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const apiUrl = document.getElementById('apiUrl').value;
+            const modelImage = document.getElementById('modelImage').files[0];
+            const productImage = document.getElementById('productImage').files[0];
+            const targetHeight = document.getElementById('targetHeight').value;
+            const outputFormat = document.getElementById('outputFormat').value;
+            
+            if (!modelImage || !productImage) {
+                alert('Please select both images');
+                return;
+            }
+            
+            // Show loading
+            loading.classList.add('active');
+            result.style.display = 'none';
+            submitBtn.disabled = true;
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('model_image', modelImage);
+            formData.append('product_image', productImage);
+            formData.append('target_height', targetHeight);
+            formData.append('output_format', outputFormat);
+            
+            try {
+                const response = await fetch(`${apiUrl}/merge`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading
+                loading.classList.remove('active');
+                submitBtn.disabled = false;
+                
+                if (response.ok && data.success) {
+                    // Show success
+                    result.className = 'result success';
+                    document.getElementById('resultTitle').textContent = '✅ Success!';
+                    document.getElementById('resultMessage').textContent = data.message;
+                    
+                    const imageUrl = `${apiUrl}${data.output.url}`;
+                    document.getElementById('resultDetails').innerHTML = `
+                        <p class="result-info"><strong>Dimensions:</strong> ${data.output.dimensions.width}x${data.output.dimensions.height}</p>
+                        <p class="result-info"><strong>Format:</strong> ${data.output.format}</p>
+                        <p class="result-info"><strong>URL:</strong> <a href="${imageUrl}" target="_blank">${imageUrl}</a></p>
+                    `;
+                    
+                    const img = document.getElementById('resultImage');
+                    img.src = imageUrl;
+                    img.style.display = 'block';
+                } else {
+                    // Show error
+                    result.className = 'result error';
+                    document.getElementById('resultTitle').textContent = '❌ Error';
+                    document.getElementById('resultMessage').textContent = 
+                        data.detail || data.message || 'Failed to merge images';
+                    document.getElementById('resultDetails').innerHTML = '';
+                    document.getElementById('resultImage').style.display = 'none';
+                }
+            } catch (error) {
+                loading.classList.remove('active');
+                submitBtn.disabled = false;
+                
+                result.className = 'result error';
+                document.getElementById('resultTitle').textContent = '❌ Connection Error';
+                document.getElementById('resultMessage').textContent = 
+                    `Could not connect to API: ${error.message}`;
+                document.getElementById('resultDetails').innerHTML = 
+                    '<p class="result-info">Make sure the API server is running at the specified URL.</p>';
+                document.getElementById('resultImage').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
+

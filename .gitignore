@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Uploads and Outputs
+uploads/
+outputs/
+merged_output.jpg
+result*.jpg
+output*.jpg
+high_quality_result.*
+
+# Test images (keep original test images)
+model.jpg
+product.jpg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Railway
+.railway/
+
