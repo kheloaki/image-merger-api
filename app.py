@@ -3,16 +3,20 @@ Image Merger API
 FastAPI service for merging model and product images
 """
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Body
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import os
+import base64
+import io
 import uuid
 from datetime import datetime
 from pathlib import Path
 import shutil
+from pydantic import BaseModel
+from typing import Optional
 
 app = FastAPI(
     title="Image Merger API",
@@ -37,6 +41,24 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 # Mount static files to serve merged images
 app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
+
+
+# Pydantic models for JSON requests
+class ImageMergeRequest(BaseModel):
+    model_image: str  # Base64 encoded image
+    product_image: str  # Base64 encoded image
+    target_height: Optional[int] = 1200
+    output_format: Optional[str] = "jpg"
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "model_image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ...",
+                "product_image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+                "target_height": 1200,
+                "output_format": "jpg"
+            }
+        }
 
 
 def merge_images_func(model_img_path: str, product_img_path: str, 
@@ -94,6 +116,27 @@ def merge_images_func(model_img_path: str, product_img_path: str,
         return False, 0, 0, str(e)
 
 
+def decode_base64_image(base64_string: str) -> Image.Image:
+    """
+    Decode base64 string to PIL Image
+    Supports both data URLs and raw base64 strings
+    """
+    try:
+        # Remove data URL prefix if present
+        if base64_string.startswith('data:'):
+            base64_string = base64_string.split(',')[1]
+        
+        # Decode base64
+        image_data = base64.b64decode(base64_string)
+        
+        # Create PIL Image from bytes
+        image = Image.open(io.BytesIO(image_data))
+        
+        return image
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid image data: {str(e)}")
+
+
 @app.get("/")
 async def root():
     """API root endpoint"""
@@ -101,7 +144,8 @@ async def root():
         "message": "Image Merger API",
         "version": "1.0.0",
         "endpoints": {
-            "POST /merge": "Merge two images",
+            "POST /merge": "Merge two images (multipart/form-data)",
+            "POST /merge-json": "Merge two images (JSON with base64)",
             "GET /health": "Health check"
         }
     }
@@ -196,6 +240,96 @@ async def merge_images_endpoint(
         if 'product_temp_path' in locals():
             Path(product_temp_path).unlink(missing_ok=True)
         
+        raise HTTPException(status_code=500, detail=f"Error processing images: {str(e)}")
+
+
+@app.post("/merge-json")
+async def merge_images_json(request: ImageMergeRequest):
+    """
+    Merge two images using JSON request with base64 encoded images
+    
+    - **model_image**: Base64 encoded model/person image (left side)
+    - **product_image**: Base64 encoded product image (right side)  
+    - **target_height**: Target height in pixels (default: 1200)
+    - **output_format**: Output format - jpg or png (default: jpg)
+    
+    Returns a JSON with the URL to the merged image
+    """
+    
+    # Validate output format
+    if request.output_format not in ['jpg', 'jpeg', 'png']:
+        raise HTTPException(status_code=400, detail="output_format must be 'jpg' or 'png'")
+    
+    # Validate target height
+    if request.target_height < 100 or request.target_height > 5000:
+        raise HTTPException(status_code=400, detail="target_height must be between 100 and 5000")
+    
+    # Generate unique filename
+    unique_id = str(uuid.uuid4())
+    output_filename = f"merged_{unique_id}.{request.output_format}"
+    output_path = OUTPUT_DIR / output_filename
+    
+    try:
+        # Decode base64 images
+        model_img = decode_base64_image(request.model_image)
+        product_img = decode_base64_image(request.product_image)
+        
+        # Convert to RGB if necessary
+        if model_img.mode != 'RGB':
+            model_img = model_img.convert('RGB')
+        if product_img.mode != 'RGB':
+            product_img = product_img.convert('RGB')
+        
+        # Calculate aspect ratios and resize
+        model_aspect = model_img.width / model_img.height
+        product_aspect = product_img.width / product_img.height
+        
+        model_new_width = int(request.target_height * model_aspect)
+        product_new_width = int(request.target_height * product_aspect)
+        
+        model_img_resized = model_img.resize(
+            (model_new_width, request.target_height), 
+            Image.Resampling.LANCZOS
+        )
+        product_img_resized = product_img.resize(
+            (product_new_width, request.target_height), 
+            Image.Resampling.LANCZOS
+        )
+        
+        # Create merged image
+        total_width = model_new_width + product_new_width
+        merged_img = Image.new('RGB', (total_width, request.target_height), (255, 255, 255))
+        
+        # Paste images side by side
+        merged_img.paste(model_img_resized, (0, 0))
+        merged_img.paste(product_img_resized, (model_new_width, 0))
+        
+        # Save with maximum quality
+        if request.output_format in ['jpg', 'jpeg']:
+            merged_img.save(str(output_path), quality=100, optimize=True, subsampling=0)
+        elif request.output_format == 'png':
+            merged_img.save(str(output_path), optimize=True, compress_level=9)
+        else:
+            merged_img.save(str(output_path), quality=100)
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Images merged successfully",
+            "output": {
+                "url": f"/outputs/{output_filename}",
+                "filename": output_filename,
+                "dimensions": {
+                    "width": total_width,
+                    "height": request.target_height
+                },
+                "format": request.output_format.upper()
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing images: {str(e)}")
 
 
