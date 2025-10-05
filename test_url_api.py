@@ -59,7 +59,7 @@ def test_url_api(base_url, model_image_url, product_image_url,
             print(f"   - Dimensions: {result['output']['dimensions']['width']}x{result['output']['dimensions']['height']}")
             print(f"   - Format: {result['output']['format']}")
             print(f"\n🔗 Merged Image URL:")
-            print(f"   {base_url}{result['output']['url']}")
+            print(f"   {result['output']['url']}")
             print(f"\n💡 You can access this URL in your browser or download it.")
             
             return True
