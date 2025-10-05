@@ -45,16 +45,16 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
 # Pydantic models for JSON requests
 class ImageMergeRequest(BaseModel):
-    model_image: str  # Base64 encoded image
-    product_image: str  # Base64 encoded image
+    model_image: str  # Image URL or base64 encoded image
+    product_image: str  # Image URL or base64 encoded image
     target_height: Optional[int] = 1200
     output_format: Optional[str] = "jpg"
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
-                "model_image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ...",
-                "product_image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+                "model_image": "https://example.com/model.jpg",
+                "product_image": "https://example.com/product.png",
                 "target_height": 1200,
                 "output_format": "jpg"
             }
@@ -116,23 +116,33 @@ def merge_images_func(model_img_path: str, product_img_path: str,
         return False, 0, 0, str(e)
 
 
-def decode_base64_image(base64_string: str) -> Image.Image:
+def load_image_from_source(image_source: str) -> Image.Image:
     """
-    Decode base64 string to PIL Image
-    Supports both data URLs and raw base64 strings
+    Load image from URL or base64 string
+    Supports both URLs and base64 encoded images
     """
     try:
-        # Remove data URL prefix if present
-        if base64_string.startswith('data:'):
-            base64_string = base64_string.split(',')[1]
-        
-        # Decode base64
-        image_data = base64.b64decode(base64_string)
-        
-        # Create PIL Image from bytes
-        image = Image.open(io.BytesIO(image_data))
+        # Check if it's a URL
+        if image_source.startswith(('http://', 'https://')):
+            # Download image from URL
+            import requests
+            response = requests.get(image_source, timeout=30)
+            response.raise_for_status()
+            image_data = response.content
+            image = Image.open(io.BytesIO(image_data))
+        elif image_source.startswith('data:'):
+            # Base64 data URL
+            base64_string = image_source.split(',')[1]
+            image_data = base64.b64decode(base64_string)
+            image = Image.open(io.BytesIO(image_data))
+        else:
+            # Raw base64 string
+            image_data = base64.b64decode(image_source)
+            image = Image.open(io.BytesIO(image_data))
         
         return image
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=400, detail=f"Failed to download image from URL: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image data: {str(e)}")
 
@@ -246,10 +256,10 @@ async def merge_images_endpoint(
 @app.post("/merge-json")
 async def merge_images_json(request: ImageMergeRequest):
     """
-    Merge two images using JSON request with base64 encoded images
+    Merge two images using JSON request with image URLs or base64 data
     
-    - **model_image**: Base64 encoded model/person image (left side)
-    - **product_image**: Base64 encoded product image (right side)  
+    - **model_image**: Image URL or base64 encoded model/person image (left side)
+    - **product_image**: Image URL or base64 encoded product image (right side)  
     - **target_height**: Target height in pixels (default: 1200)
     - **output_format**: Output format - jpg or png (default: jpg)
     
@@ -270,9 +280,9 @@ async def merge_images_json(request: ImageMergeRequest):
     output_path = OUTPUT_DIR / output_filename
     
     try:
-        # Decode base64 images
-        model_img = decode_base64_image(request.model_image)
-        product_img = decode_base64_image(request.product_image)
+        # Load images from URLs or base64
+        model_img = load_image_from_source(request.model_image)
+        product_img = load_image_from_source(request.product_image)
         
         # Convert to RGB if necessary
         if model_img.mode != 'RGB':
