@@ -95,29 +95,34 @@ def merge_images_func(model_img_path: str, product_img_path: str,
         elif product_img.mode != 'RGB':
             product_img = product_img.convert('RGB')
         
-        # Calculate aspect ratios and resize
+        # Resize model image to target height, keep product at original size
         model_aspect = model_img.width / model_img.height
-        product_aspect = product_img.width / product_img.height
-        
         model_new_width = int(target_height * model_aspect)
-        product_new_width = int(target_height * product_aspect)
         
         model_img_resized = model_img.resize(
             (model_new_width, target_height), 
             Image.Resampling.LANCZOS
         )
-        product_img_resized = product_img.resize(
-            (product_new_width, target_height), 
-            Image.Resampling.LANCZOS
-        )
         
-        # Create merged image
-        total_width = model_new_width + product_new_width
-        merged_img = Image.new('RGB', (total_width, target_height), (255, 255, 255))
+        # Keep product image at its original size
+        product_img_resized = product_img
+        product_width = product_img.width
+        product_height = product_img.height
         
-        # Paste images side by side
-        merged_img.paste(model_img_resized, (0, 0))
-        merged_img.paste(product_img_resized, (model_new_width, 0))
+        # Use the maximum height between model and product
+        final_height = max(target_height, product_height)
+        
+        # Create merged image with enough space for both
+        total_width = model_new_width + product_width
+        merged_img = Image.new('RGB', (total_width, final_height), (255, 255, 255))
+        
+        # Paste model image on the left (centered vertically if needed)
+        model_y_offset = (final_height - target_height) // 2
+        merged_img.paste(model_img_resized, (0, model_y_offset))
+        
+        # Paste product image on the right (centered vertically if needed)
+        product_y_offset = (final_height - product_height) // 2
+        merged_img.paste(product_img_resized, (model_new_width, product_y_offset))
         
         # Save with maximum quality
         file_ext = output_path.lower().split('.')[-1]
@@ -128,7 +133,7 @@ def merge_images_func(model_img_path: str, product_img_path: str,
         else:
             merged_img.save(output_path, quality=100)
         
-        return True, total_width, target_height
+        return True, total_width, final_height
     
     except Exception as e:
         return False, 0, 0, str(e)
@@ -325,29 +330,34 @@ async def merge_images_json(request: ImageMergeRequest):
         elif product_img.mode != 'RGB':
             product_img = product_img.convert('RGB')
         
-        # Calculate aspect ratios and resize
+        # Resize model image to target height, keep product at original size
         model_aspect = model_img.width / model_img.height
-        product_aspect = product_img.width / product_img.height
-        
         model_new_width = int(request.target_height * model_aspect)
-        product_new_width = int(request.target_height * product_aspect)
         
         model_img_resized = model_img.resize(
             (model_new_width, request.target_height), 
             Image.Resampling.LANCZOS
         )
-        product_img_resized = product_img.resize(
-            (product_new_width, request.target_height), 
-            Image.Resampling.LANCZOS
-        )
         
-        # Create merged image
-        total_width = model_new_width + product_new_width
-        merged_img = Image.new('RGB', (total_width, request.target_height), (255, 255, 255))
+        # Keep product image at its original size
+        product_img_resized = product_img
+        product_width = product_img.width
+        product_height = product_img.height
         
-        # Paste images side by side
-        merged_img.paste(model_img_resized, (0, 0))
-        merged_img.paste(product_img_resized, (model_new_width, 0))
+        # Use the maximum height between model and product
+        final_height = max(request.target_height, product_height)
+        
+        # Create merged image with enough space for both
+        total_width = model_new_width + product_width
+        merged_img = Image.new('RGB', (total_width, final_height), (255, 255, 255))
+        
+        # Paste model image on the left (centered vertically if needed)
+        model_y_offset = (final_height - request.target_height) // 2
+        merged_img.paste(model_img_resized, (0, model_y_offset))
+        
+        # Paste product image on the right (centered vertically if needed)
+        product_y_offset = (final_height - product_height) // 2
+        merged_img.paste(product_img_resized, (model_new_width, product_y_offset))
         
         # Save with maximum quality
         if request.output_format in ['jpg', 'jpeg']:
@@ -368,7 +378,7 @@ async def merge_images_json(request: ImageMergeRequest):
                 "filename": output_filename,
                 "dimensions": {
                     "width": total_width,
-                    "height": request.target_height
+                    "height": final_height
                 },
                 "format": request.output_format.upper()
             },
