@@ -12,6 +12,7 @@ import os
 import base64
 import io
 import uuid
+import requests
 from datetime import datetime
 from pathlib import Path
 import shutil
@@ -125,7 +126,6 @@ def load_image_from_source(image_source: str) -> Image.Image:
         # Check if it's a URL
         if image_source.startswith(('http://', 'https://')):
             # Download image from URL
-            import requests
             response = requests.get(image_source, timeout=30)
             response.raise_for_status()
             image_data = response.content
