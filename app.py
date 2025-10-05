@@ -72,10 +72,27 @@ def merge_images_func(model_img_path: str, product_img_path: str,
         model_img = Image.open(model_img_path)
         product_img = Image.open(product_img_path)
         
-        # Convert to RGB if necessary
-        if model_img.mode != 'RGB':
+        # Handle transparent backgrounds properly
+        if model_img.mode in ('RGBA', 'LA'):
+            # Create white background for transparent images
+            background = Image.new('RGB', model_img.size, (255, 255, 255))
+            if model_img.mode == 'RGBA':
+                background.paste(model_img, mask=model_img.split()[-1])
+            else:
+                background.paste(model_img)
+            model_img = background
+        elif model_img.mode != 'RGB':
             model_img = model_img.convert('RGB')
-        if product_img.mode != 'RGB':
+            
+        if product_img.mode in ('RGBA', 'LA'):
+            # Create white background for transparent images
+            background = Image.new('RGB', product_img.size, (255, 255, 255))
+            if product_img.mode == 'RGBA':
+                background.paste(product_img, mask=product_img.split()[-1])
+            else:
+                background.paste(product_img)
+            product_img = background
+        elif product_img.mode != 'RGB':
             product_img = product_img.convert('RGB')
         
         # Calculate aspect ratios and resize
@@ -285,10 +302,27 @@ async def merge_images_json(request: ImageMergeRequest):
         model_img = load_image_from_source(request.model_image)
         product_img = load_image_from_source(request.product_image)
         
-        # Convert to RGB if necessary
-        if model_img.mode != 'RGB':
+        # Handle transparent backgrounds properly
+        if model_img.mode in ('RGBA', 'LA'):
+            # Create white background for transparent images
+            background = Image.new('RGB', model_img.size, (255, 255, 255))
+            if model_img.mode == 'RGBA':
+                background.paste(model_img, mask=model_img.split()[-1])
+            else:
+                background.paste(model_img)
+            model_img = background
+        elif model_img.mode != 'RGB':
             model_img = model_img.convert('RGB')
-        if product_img.mode != 'RGB':
+            
+        if product_img.mode in ('RGBA', 'LA'):
+            # Create white background for transparent images
+            background = Image.new('RGB', product_img.size, (255, 255, 255))
+            if product_img.mode == 'RGBA':
+                background.paste(product_img, mask=product_img.split()[-1])
+            else:
+                background.paste(product_img)
+            product_img = background
+        elif product_img.mode != 'RGB':
             product_img = product_img.convert('RGB')
         
         # Calculate aspect ratios and resize
