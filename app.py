@@ -224,13 +224,14 @@ async def merge_images_endpoint(
         product_temp_path.unlink(missing_ok=True)
         
         if result[0]:
-            # Get the base URL from the request
-            # For Railway, this will automatically use the deployed URL
+            # Get the base URL - use Railway URL for production
+            base_url = "https://image-merger-api-production.up.railway.app"
+            
             return JSONResponse({
                 "success": True,
                 "message": "Images merged successfully",
                 "output": {
-                    "url": f"/outputs/{output_filename}",
+                    "url": f"{base_url}/outputs/{output_filename}",
                     "filename": output_filename,
                     "dimensions": {
                         "width": result[1],
@@ -322,11 +323,14 @@ async def merge_images_json(request: ImageMergeRequest):
         else:
             merged_img.save(str(output_path), quality=100)
         
+        # Get the base URL - use Railway URL for production, localhost for development
+        base_url = "https://image-merger-api-production.up.railway.app"
+        
         return JSONResponse({
             "success": True,
             "message": "Images merged successfully",
             "output": {
-                "url": f"/outputs/{output_filename}",
+                "url": f"{base_url}/outputs/{output_filename}",
                 "filename": output_filename,
                 "dimensions": {
                     "width": total_width,
